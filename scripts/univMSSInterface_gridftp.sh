@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#set -x
+set -x
 
 ## Copyright (c) 2009 Data Intensive Cyberinfrastructure Foundation. All rights reserved.
 ## For full copyright notice please refer to files in the COPYRIGHT directory
@@ -26,8 +26,9 @@
 # 2015-08-10 - v1.08 - RV - implement retries from dCache to iRODS during copy with gridftp.
 # 2015-10-14 - v1.09 - RV - implement stat function as it is being used in iRODS 4.1.6.
 # 2015-10-20 - v1.10 - RV - implement stat function for gridftp. Before it was only a simple stat
+# 2016-07-01 - v1.11 - RV - implement gridftp only script.
 
-VERSION=v1.10
+VERSION=v1.11
 PROG=`basename $0`
 DEBUG=3
 ID=$RANDOM
@@ -35,10 +36,6 @@ STATUS="OK"
 
 # define logfile location
 LOGFILE=/var/log/irods/univMSSInterface.log
-
-# parameter to define access to external storage
-ACCESS=gridftp
-
 
 # gridftp parameters 
 # enable gridftp for communication and do not use NFS
@@ -75,20 +72,9 @@ syncToArch () {
 	if [ -s $1 ] 
 	then
 		# so we have a NON-empty file. Copy it
-		case ${ACCESS} in
-			gridftp) # Use gridftp to do transfers
-					syncToArchGridftp $sourceFile $destFile
-					error=$?
-					;;
-			cp) # Use cp to do transfers
-				syncToArchCp $sourceFile $destFile
-				error=$?
-				;;
-			*) # an error
-				_log 2 syncToArch "Unknown access method to storage"
-				error=1
-				;;
-		esac
+		# Use gridftp to do transfers
+		syncToArchGridftp $sourceFile $destFile
+		error=$?
 	else
 		_log 2 syncToArch "file \"$1\" is empty. Do not copy an empty file"
 		error=1
@@ -118,20 +104,9 @@ stageToCache () {
 	destFile=$(echo $2 | sed -e 's/,/\\,/g')
 	error=0
 
-	case ${ACCESS} in
-		gridftp) # Use gridftp to do transfers
-				stageToCacheGridftp $sourceFile $destFile
-				error=$?
-				;;
-		cp) # Use cp to do transfers
-			stageToCacheCp $sourceFile $destFile
-			error=$?
-			;;
-		*) # an error
-			_log 2 stageToCache "Unknown access method to storage"
-			error=1
-			;;
-	esac
+	# Use gridftp to do transfers
+	stageToCacheGridftp $sourceFile $destFile
+	error=$?
 
 	if [ $error != 0 ] # copy failure 
 	then
@@ -151,20 +126,9 @@ mkdir () {
 	destDir=$1
 	error=0
 
-	case ${ACCESS} in
-		gridftp) # Use gridftp make directory
-				mkdirGridftp $destDir
-				error=$?
-				;;
-		cp) # Use cp to make directory
-			mkdirCp $destDir
-			error=$?
-			;;
-		*) # an error
-			_log 2 mkdir "Unknown access method to storage"
-			error=1
-			;;
-	esac
+	# Use gridftp make directory
+	mkdirGridftp $destDir
+	error=$?
 
 	if [ $error != 0 ] # mkdir failure 
 	then
@@ -185,20 +149,9 @@ chmod () {
 	destAcl=$2
 	error=0
 
-	case ${ACCESS} in
-		gridftp) # Use gridftp to set ACL on file or directory
-				chmodGridftp $destFile  $destAcl
-				error=$?
-				;;
-		cp) # Use cp to set ACL on file or directory
-			chmodCp $destFile $destAcl
-			error=$?
-			;;
-		*) # an error
-			_log 2 chmod "Unknown access method to storage"
-			error=1
-			;;
-	esac
+	# Use gridftp to set ACL on file or directory
+	chmodGridftp $destFile  $destAcl
+	error=$?
 
 	if [ $error != 0 ] # chmod failure 
 	then
@@ -222,20 +175,9 @@ rm () {
 	destFile=$(echo $1 | sed -e 's/,/\\,/g')
 	error=0
 
-	case ${ACCESS} in
-		gridftp) # Use gridftp to remove a file
-				rmGridftp $destFile 
-				error=$?
-				;;
-		cp) # Use cp to remove a file
-			rmCp $destFile
-			error=$?
-			;;
-		*) # an error
-			_log 2 rm "Unknown access method to storage"
-			error=1
-			;;
-	esac
+	# Use gridftp to remove a file
+	rmGridftp $destFile 
+	error=$?
 
 	if [ $error != 0 ] # rm failure 
 	then
@@ -261,20 +203,9 @@ mv () {
 	destFile=$(echo $2 | sed -e 's/,/\\,/g')
 	error=0
 
-	case ${ACCESS} in
-		gridftp) # Use gridftp to move a file
-				mvGridftp $sourceFile $destFile 
-				error=$?
-				;;
-		cp) # Use cp to move a file
-			mvCp $sourceFile $destFile
-			error=$?
-			;;
-		*) # an error
-			_log 2 mv "Unknown access method to storage"
-			error=1
-			;;
-	esac
+	# Use gridftp to move a file
+	mvGridftp $sourceFile $destFile 
+	error=$?
 
 	if [ $error != 0 ] # mv failure 
 	then
@@ -294,20 +225,9 @@ stat () {
 	sourceFile=$(echo $1 | sed -e 's/,/\\,/g')
 	error=0
 
-	case ${ACCESS} in
-		gridftp) # Use gridftp to move a file
-				statGridftp $sourceFile
-				error=$?
-				;;
-		cp) # Use cp to move a file
-			statCp $sourceFile
-			error=$?
-			;;
-		*) # an error
-			_log 2 stat "Unknown access method to storage"
-			error=1
-			;;
-	esac
+	# Use gridftp to move a file
+	statGridftp $sourceFile
+	error=$?
 
 	if [ $error != 0 ] # stat failure
 	then
@@ -359,28 +279,6 @@ syncToArchGridftp () {
 	return $error
 }
 
-syncToArchCp () {
-	# helper function normal cp
-	# <your command or script to copy from cache to MSS> $1 $2 
-	# sourceFile=$1
-	# destFile=$2
-
-	error=0
-
-	if [ -e "$2" ]
-	then
-		_log 2 syncToArch "file \"$2\" already exists. Remove it"
-		_log 2 syncToArch "executing: /bin/rm \"$2\""
-		/bin/rm  "$2"
-	fi
-
-	_log 2 syncToArch "executing: /bin/cp -f \"$1\" \"$2\""
-	/bin/cp -f "$1" "$2"
-	error=$?
-
-	return $error
-}
-
 stageToCacheGridftp () {
 	# helper function gridftp
 	# <your command or script to copy from MSS to cache> $1 $2 
@@ -414,21 +312,6 @@ stageToCacheGridftp () {
 	then
 		_log 2 stageToCache "error-message: $status"
 	fi 
-
-	return $error
-}
-
-stageToCacheCp () {
-	# helper function cp
-	# <your command or script to copy from  MSS to cache> $1 $2 
-	# sourceFile=$1
-	# destFile=$2
-
-	error=0
-
-	_log 2 stageToCache "executing: /bin/cp \"$1\" \"$2\""
-	/bin/cp "$1" "$2"
-	error=$?
 
 	return $error
 }
@@ -498,25 +381,6 @@ mkdirGridftp () {
 	return $error
 }
 
-mkdirCp () {
-	# helper function cp
-	# <your command to make a directory in the MSS> $1
-	# destDir=$1
-
-	error=0
-
-	if [ -d "$1" ]
-	then
-		_log 2 mkdir "directory \"$1\" already exists. Not recreating directory"
-	else
-		_log 2 mkdir "executing: /bin/mkdir -p \"$1\""
-		/bin/mkdir -p "$1"
-		error=$?
-	fi
-
-	return $error
-}
-
 chmodGridftp () {
 	# helper function gridftp
 	# <your command to modify ACL> $1 $2
@@ -534,21 +398,6 @@ chmodGridftp () {
 	return $error
 }
 
-chmodCp () {
-	# helper function cp
-	# <your command to modify ACL> $1 $2
-	# destFile=$1
-	# destAcl=$2
-
-	error=0
-
-	_log 2 chmod "executing: /bin/chmod $2 \"$1\""
-	/bin/chmod $2 "$1"
-	error=$?
-
-	return $error
-}
-
 rmGridftp () {
 	# helper function gridftp
 	# <your command to remove file> $1
@@ -559,20 +408,6 @@ rmGridftp () {
 	# Use gridftp to do transfers
 	_log 2 rm "executing: $GRIDFTPCOMMAND -rm  \"${GRIDFTPURL}$1\""
 	$GRIDFTPCOMMAND -rm  "${GRIDFTPURL}$1"
-	error=$?
-
-	return $error
-}
-
-rmCp () {
-	# helper function cp
-	# <your command to remove file> $1
-	# destFile=$1
-
-	error=0
-
-	_log 2 rm "executing: /bin/rm \"$1\""
-	/bin/rm "$1"
 	error=$?
 
 	return $error
@@ -598,21 +433,6 @@ mvGridftp () {
 		$GRIDFTPCOMMAND -rm  "${GRIDFTPURL}$1"
 		error=$?
 	fi
-
-	return $error
-}
-
-mvCp () {
-	# helper function cp
-	# <your command to rename a file in the MSS> $1 $2
-	#sourceFile=$1
-	#destFile=$2
-
-	error=0
-
-	_log 2 mv "executing: /bin/mv \"$1\" \"$2\""
-    /bin/mv "$1" "$2"
-	error=$?
 
 	return $error
 }
@@ -682,56 +502,6 @@ statGridftp () {
 
 	return $error
 }
-
-
-# function to do a stat on a file $1 stored in the MSS
-statCp () {
-	# helper function stat
-	# <your command to retrieve stats on the file> $1
-	# e.g: output=`/usr/local/bin/rfstat rfioServerFoo:$1`
-
-	error=0
-
-	_log 2 stat "executing: /usr/bin/stat \"$1\" "
-	output=`/usr/bin/stat "$1"`
-	error=$?
-	if [ $error != 0 ] # if file does not exist or information not available
-	then
-		STATUS="FAILURE"
-		_log 2 stat "executing: stat command failed"
-	else
-		# parse the output.
-		# Parameters to retrieve: device ID of device containing file("device"), 
-		#                         file serial number ("inode"), ACL mode in octal ("mode"),
-		#                         number of hard links to the file ("nlink"),
-		#                         user id of file ("uid"), group id of file ("gid"),
-		#                         device id ("devid"), file size ("size"), last access time ("atime"),
-		#                         last modification time ("mtime"), last change time ("ctime"),
-		#                         block size in bytes ("blksize"), number of blocks ("blkcnt")
-		# e.g: device=`echo $output | awk '{print $3}'`	
-		# Note 1: if some of these parameters are not relevant, set them to 0.
-		# Note 2: the time should have this format: YYYY-MM-dd-hh.mm.ss with: 
-		#                                           YYYY = 1900 to 2xxxx, MM = 1 to 12, dd = 1 to 31,
-		#                                           hh = 0 to 24, mm = 0 to 59, ss = 0 to 59
-		device=` echo $output | sed -nr 's/.*\<Device: *(\S*)\>.*/\1/p'`
-		inode=`  echo $output | sed -nr 's/.*\<Inode: *(\S*)\>.*/\1/p'`
-		mode=`   echo $output | sed -nr 's/.*\<Access: *\(([0-9]*)\/.*/\1/p'`
-		nlink=`  echo $output | sed -nr 's/.*\<Links: *([0-9]*)\>.*/\1/p'`
-		uid=`    echo $output | sed -nr 's/.*\<Uid: *\( *([0-9]*)\/.*/\1/p'`
-		gid=`    echo $output | sed -nr 's/.*\<Gid: *\( *([0-9]*)\/.*/\1/p'`
-		devid="0"
-		size=`   echo $output | sed -nr 's/.*\<Size: *([0-9]*)\>.*/\1/p'`
-		blksize=`echo $output | sed -nr 's/.*\<IO Block: *([0-9]*)\>.*/\1/p'`
-		blkcnt=` echo $output | sed -nr 's/.*\<Blocks: *([0-9]*)\>.*/\1/p'`
-		atime=`  echo $output | sed -nr 's/.*\<Access: *([0-9]{4,}-[01][0-9]-[0-3][0-9]) *([0-2][0-9]):([0-5][0-9]):([0-6][0-9])\..*/\1-\2.\3.\4/p'`
-		mtime=`  echo $output | sed -nr 's/.*\<Modify: *([0-9]{4,}-[01][0-9]-[0-3][0-9]) *([0-2][0-9]):([0-5][0-9]):([0-6][0-9])\..*/\1-\2.\3.\4/p'`
-		ctime=`  echo $output | sed -nr 's/.*\<Change: *([0-9]{4,}-[01][0-9]-[0-3][0-9]) *([0-2][0-9]):([0-5][0-9]):([0-6][0-9])\..*/\1-\2.\3.\4/p'`
-		echo "$device:$inode:$mode:$nlink:$uid:$gid:$devid:$size:$blksize:$blkcnt:$atime:$mtime:$ctime"
-	fi
-
-    return $error
-}
-
 
 #############################################
 # below this line, nothing should be changed.
