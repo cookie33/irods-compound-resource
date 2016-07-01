@@ -25,7 +25,7 @@ The creation was done as follows:
 
         iadmin mkresc  eudatPnfs 'univmss' compound <fqdn> /pnfs/grid.sara.nl/data/irods
         iadmin modresc eudatPnfs comment "eudat pnfs storage"
-        iadmin modresc eudatPnfs context univMSSInterface.sh
+        iadmin modresc eudatPnfs context univMSSInterface_generic.sh
 
 3. Create a composable resource
 

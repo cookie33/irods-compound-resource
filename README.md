@@ -8,7 +8,8 @@ At SURFsara the composable resource comprises off:
 - cache. local disk space.
 - archive. storage reachable via gridftp (dCache)
 
-The archive storage is used via the univMSSInterface.sh driver script.
+The archive storage is used via the univMSSInterface_generic.sh driver script.
+The appropiate univMSSInterface[_access_method].sh is than called. 
 
 Data is always put in the cache. iRODS rules replicate data to the archive.
 This way the data transfer for a user is finished once the data is in the
