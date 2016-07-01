@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -x
+#set -x
 
 ## Copyright (c) 2009 Data Intensive Cyberinfrastructure Foundation. All rights reserved.
 ## For full copyright notice please refer to files in the COPYRIGHT directory
