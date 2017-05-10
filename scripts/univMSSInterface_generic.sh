@@ -21,8 +21,9 @@
 
 # Changelog:
 # 2016-07-01 - v1.00 - RV - create initial univMSSInterface_generic.sh from univMSSInterface.sh
+# 2017-05-10 - v1.01 - RV - add staging on Archive functions
 
-VERSION=v1.00
+VERSION=v1.01
 PROG=`basename $0`
 FILEPATH=`dirname $0`
 
@@ -45,6 +46,8 @@ case "$1" in
 	rm )    $univMSSInterface $1 $2 ;;
 	mv )    $univMSSInterface $1 $2 $3 ;;
 	stat )  $univMSSInterface $1 $2 ;;
+	stageOnArch )  $univMSSInterface $1 $2 ;;
+	checkOnArch )  $univMSSInterface $1 $2 ;;
 esac
 
 exit $?
