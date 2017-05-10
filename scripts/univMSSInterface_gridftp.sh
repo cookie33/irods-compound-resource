@@ -27,8 +27,9 @@
 # 2015-10-14 - v1.09 - RV - implement stat function as it is being used in iRODS 4.1.6.
 # 2015-10-20 - v1.10 - RV - implement stat function for gridftp. Before it was only a simple stat
 # 2016-07-01 - v1.11 - RV - implement gridftp only script.
+# 2017-05-10 - v1.12 - RV - add staging on Archive functions. Remove IPv6 addresses from host pool
 
-VERSION=v1.11
+VERSION=v1.12
 PROG=`basename $0`
 DEBUG=3
 ID=$RANDOM
@@ -41,12 +42,16 @@ LOGFILE=/var/log/irods/univMSSInterface.log
 # enable gridftp for communication and do not use NFS
 GRIDFTPCOMMAND=/usr/bin/uberftp
 # use a random ip address for a gridftp server
-declare -a GRIFTPSERVERS=(`host gridftp.grid.sara.nl | awk '{print $4}'`)
+declare -a GRIFTPSERVERS=(`host gridftp.grid.sara.nl | grep -vi IPv6 | awk '{print $4}'`)
 GRIDFTPIPADDRESSRANDOM=$(( $RANDOM % ${#GRIFTPSERVERS[@]} ))
 GRIDFTPADDRESS="${GRIFTPSERVERS[$GRIDFTPIPADDRESSRANDOM]}"
 GRIDFTPSERVERNAME=`host $GRIDFTPADDRESS | awk '{print $NF}' | sed 's/\.$//'`
 GRIDFTPURL="gsiftp://${GRIDFTPSERVERNAME}"
 GRIDFTPMINIMALSTRING="/pnfs/grid.sara.nl/data/irods" 
+
+# dccp commands for staging
+DCCPCOMMAND=/usr/bin/dccp
+DCCPURL="gsidcap://${GRIDFTPSERVERNAME}"
 
 
 #############################################
@@ -234,6 +239,46 @@ stat () {
 		STATUS="FAILURE"
 	fi
 	_log 2 stat "The status is $error ($STATUS)"
+	return $error
+}
+
+stageOnArch () {
+	# <your command to stage a file on the archive> $1
+        # e.g: output=`dccp -P  gsidcap://fqdn/pnfs/data/irods/home/rods/icmdtest1/foo1`
+	_log 2 stageOnArch "entering stageOnArch()=$*"
+
+	sourceFile=$(echo $1 | sed -e 's/,/\\,/g')
+	error=0
+
+	# Use dccp to stage a file
+	stageOnArchDccp $sourceFile
+	error=$?
+
+	if [ $error != 0 ] # stat failure
+	then
+		STATUS="FAILURE"
+	fi
+	_log 2 stageOnArch "The status is $error ($STATUS)"
+	return $error
+}
+
+checkOnArch () {
+	# <your command to stage a file on the archive> $1
+        # e.g: output=`dccp -P  gsidcap://fqdn/pnfs/data/irods/home/rods/icmdtest1/foo1`
+	_log 2 checkOnArch "entering checkOnArch()=$*"
+
+	sourceFile=$(echo $1 | sed -e 's/,/\\,/g')
+	error=0
+
+	# Use dccp to stage a file
+	checkOnArchDccp $sourceFile
+	error=$?
+
+	if [ $error != 0 ] # stat failure
+	then
+		STATUS="FAILURE"
+	fi
+	_log 2 checkOnArch "The status is $error ($STATUS)"
 	return $error
 }
 
@@ -450,7 +495,7 @@ statGridftp () {
 	error=$?
 	if [ $error != 0 ] # stat failure 
 	then
-		_log 2 stat "executing: $GRIDFTPCOMMAND -dir \"${GRIDFTPURL}$1\"  failed"
+		_log 2 stat "executing: $GRIDFTPCOMMAND -dir \"${GRIDFTPURL}$1\" failed"
 	else
 		# parse the output.
 		# Parameters to retrieve: device ID of device containing file("device"), 
@@ -503,6 +548,48 @@ statGridftp () {
 	return $error
 }
 
+stageOnArchDccp () {
+	# helper function dccp
+	# <your command to stage a file in the MSS> $1
+	#sourceFile=$1
+	
+	error=0
+
+	# Use dccp to do staging
+	_log 2 stageOnArchDccp "executing: $DCCPCOMMAND -P \"${DCCPURL}$1\""
+	output=`$DCCPCOMMAND -P "${DCCPURL}$1" 2>&1`
+	error=$?
+	if [ $error != 0 ] # stage failure 
+	then
+		_log 2 stageOnArchDccp "executing: $DCCPCOMMAND -P \"${DCCPURL}$1\" failed"
+	fi
+	return $error
+}
+
+checkOnArchDccp () {
+	# helper function dccp
+	# <your command to check the status of a file in the MSS> $1
+	#sourceFile=$1
+	
+	error=0
+
+	# Use dccp to do checking
+	_log 2 checkOnArchDccp "executing: $DCCPCOMMAND -P -t -1 \"${DCCPURL}$1\""
+	output=`$DCCPCOMMAND -P -t -1 "${DCCPURL}$1" 2>&1`
+	error=$?
+	if [ $error != 0 ] # check failure 
+	then
+		if  [  $error = 255 ] 
+		then
+			_log 2 checkOnArchDccp "executing: $DCCPCOMMAND -P -t -1 \"${DCCPURL}$1\" gives file NOT online"
+		else
+			_log 2 checkOnArchDccp "executing: $DCCPCOMMAND -P -t -1 \"${DCCPURL}$1\" failed"
+		fi
+	fi
+	return $error
+}
+
+
 #############################################
 # below this line, nothing should be changed.
 #############################################
@@ -515,6 +602,8 @@ case "$1" in
 	rm ) $1 $2 ;;
 	mv ) $1 $2 $3 ;;
 	stat ) $1 $2 ;;
+	stageOnArch ) $1 $2 ;;
+	checkOnArch ) $1 $2 ;;
 esac
 
 exit $?
